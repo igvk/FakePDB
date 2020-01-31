@@ -19,9 +19,11 @@
 
 #include <llvm/Support/Error.h>
 
-PeFile::PeFile(std::filesystem::path& path) : _binary(llvm::object::createBinary(path.string()))
+PeFile::PeFile(const std::filesystem::path& path) : _binary(llvm::object::createBinary(path.string()))
 {
-    _obj = llvm::dyn_cast<llvm::object::COFFObjectFile>(_binary.get().getBinary());
+    if (!_binary.takeError()) {
+        _obj = llvm::dyn_cast<llvm::object::COFFObjectFile>((*_binary).getBinary());
+    }
 }
 
 std::vector<uint8_t> PeFile::GetPdbGuid()
@@ -30,6 +32,9 @@ std::vector<uint8_t> PeFile::GetPdbGuid()
     llvm::StringRef PDBFileName;
 
     _obj->getDebugPDBInfo(DebugInfo, PDBFileName);
+    if (!DebugInfo)
+        return std::vector<uint8_t>(16);
+
     return std::vector<uint8_t>(&DebugInfo->PDB70.Signature[0], &DebugInfo->PDB70.Signature[16]);
 }
 
@@ -46,13 +51,18 @@ uint32_t PeFile::GetPdbAge()
     return DebugInfo->PDB70.Age;
 }
 
-std::string PeFile::GetPdbFilepath()
+std::filesystem::path PeFile::GetPdbFilepath()
 {
     const llvm::codeview::DebugInfo* DebugInfo;
     llvm::StringRef PDBFileName;
 
     _obj->getDebugPDBInfo(DebugInfo, PDBFileName);
-    return std::string(PDBFileName);
+    return std::filesystem::path(std::string(PDBFileName));
+}
+
+std::filesystem::path PeFile::GetPdbFilename()
+{
+    return GetPdbFilepath().filename();
 }
 
 llvm::ArrayRef<llvm::object::coff_section> PeFile::GetSectionHeaders()
@@ -105,7 +115,18 @@ uint32_t PeFile::GetTimestamp()
 
 uint32_t PeFile::GetImageSize()
 {
-	const llvm::object::pe32_header* pe32 = nullptr;
-	_obj->getPE32Header(pe32);
-	return pe32->SizeOfImage;
+    auto* pe32 = _obj->getPE32Header();
+    if (pe32) {
+        return pe32->SizeOfImage;
+    }
+
+    auto* pe32plus = _obj->getPE32PlusHeader();
+    if (pe32plus) {
+        return pe32plus->SizeOfImage;
+    }
+}
+
+llvm::COFF::MachineTypes PeFile::GetMachine()
+{
+    return static_cast<llvm::COFF::MachineTypes>(_obj->getMachine());
 }

@@ -176,7 +176,9 @@ def processNames():
 
     for i in xrange(ida_name.get_nlist_size()):
         ea = ida_name.get_nlist_ea(i)
-        
+        if ida_funcs.get_func(ea) is not None:
+            continue
+
         name = {
             'ea'        : ea,
             'name'      : ida_name.get_nlist_name(i),
@@ -191,7 +193,7 @@ def processNames():
 def main():
     filepath = ida_loader.get_path(ida_loader.PATH_TYPE_IDB)
     pre, ext = os.path.splitext(filepath)
-    filepath = pre + ".json"
+    filepath = pre + ".exe.json"
 
     output = {
         'segments'  : processSegments(),

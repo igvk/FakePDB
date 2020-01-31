@@ -27,11 +27,15 @@
 
 class PeFile {
 public:
-    PeFile(std::filesystem::path& path);
+    PeFile(const std::filesystem::path& path);
 
     std::vector<uint8_t> GetPdbGuid();
+    
     uint32_t GetPdbAge();
-    std::string GetPdbFilepath();
+
+    std::filesystem::path GetPdbFilepath();
+
+    std::filesystem::path GetPdbFilename();
 
     llvm::ArrayRef<llvm::object::coff_section> GetSectionHeaders();
 
@@ -42,6 +46,8 @@ public:
 	uint32_t GetTimestamp();
 
 	uint32_t GetImageSize();
+
+    llvm::COFF::MachineTypes GetMachine();
 
 private:
     
