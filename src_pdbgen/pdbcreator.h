@@ -22,6 +22,7 @@
 
 #include <llvm/DebugInfo/PDB/Native/PDBFileBuilder.h>
 #include <llvm/DebugInfo/PDB/Native/DbiStreamBuilder.h>
+#include <llvm/DebugInfo/PDB/Native/GSIStreamBuilder.h>
 #include <llvm/DebugInfo/PDB/Native/InfoStreamBuilder.h>
 #include <llvm/DebugInfo/PDB/Native/TpiStreamBuilder.h>
 #include <llvm/DebugInfo/PDB/Native/RawConstants.h>
@@ -32,7 +33,7 @@
 class PdbCreator {
 public:
 
-    PdbCreator(PeFile& peFile);
+    PdbCreator(PeFile& peFile, bool withLabels);
 
     bool Initialize();
 
@@ -51,10 +52,13 @@ private:
 
     void processSymbols();
 
-    llvm::codeview::PublicSym32 createPublicSymbol(IdaFunction& idaFunc);
-    llvm::codeview::PublicSym32 createPublicSymbol(IdaName& idaName);
+    llvm::pdb::BulkPublic createPublicSymbol(IdaFunction& idaFunc);
+    llvm::pdb::BulkPublic createPublicSymbol(const IdaLabel& idaLabel, const IdaFunction& idaFunc);
+    llvm::pdb::BulkPublic createPublicSymbol(IdaName& idaName);
 
     PeFile& _pefile;
+
+    bool _withLabels;
 
     llvm::BumpPtrAllocator _allocator;
     llvm::pdb::PDBFileBuilder _pdbBuilder;

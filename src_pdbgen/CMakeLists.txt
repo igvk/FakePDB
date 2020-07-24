@@ -21,6 +21,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(LLVM REQUIRED CONFIG)
 
+if (MSVC)
+    # silence warnings from LLVM headers
+    add_compile_options(/experimental:external /external:anglebrackets /external:W0)
+    add_compile_definitions(_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
+
+    add_compile_options(/W4)
+else()
+    add_compile_options(-Wall -Wextra)
+endif()
+
 add_library(pdbgen_common STATIC)
 target_sources(pdbgen_common PRIVATE
     guidhelper.h
@@ -50,3 +60,7 @@ add_executable(pdbgen_test_pefile_1)
 target_sources(pdbgen_test_pefile_1 PRIVATE "test/test_pefile_1.cpp")
 target_link_libraries(pdbgen_test_pefile_1 PRIVATE pdbgen_common)
 
+install(
+    TARGETS pdbgen
+    RUNTIME DESTINATION bin
+)
