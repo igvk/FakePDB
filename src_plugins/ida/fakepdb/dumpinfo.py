@@ -313,7 +313,8 @@ class DumpInfo():
             'exports'   : self.__process_exports(),
             'functions' : self.__process_functions(),
             'names'     : self.__process_names(),
-            'structs'   : self.__process_structs()
+            'structs'   : self.__process_structs(),
+            'types'     : self.__process_types(),
         }
 
         with open(filepath, "w") as f:
@@ -651,6 +652,19 @@ class DumpInfo():
         return 'unknown_%s_%s_%s' % (hex(type_base), hex(type_flags), hex(type_modif))
 
     #
+    # private/get
+    #
+
+    def __get_type_data(self, ea):
+        tinfo = ida_typeinf.tinfo_t()
+        ida_nalt.get_tinfo(tinfo, ea)
+        func_type_data = ida_typeinf.func_type_data_t()
+        tinfo.get_func_details(func_type_data)
+        
+        return func_type_data
+
+
+    #
     # private/process
     #
 
@@ -702,11 +716,7 @@ class DumpInfo():
 
     def __process_function_typeinfo(self, info, func):
 
-        tinfo = ida_typeinf.tinfo_t()
-        ida_nalt.get_tinfo(tinfo,func.start_ea)
-        
-        func_type_data = ida_typeinf.func_type_data_t()
-        tinfo.get_func_details(func_type_data)
+        func_type_data = self.__get_type_data(func.start_ea)
 
         #calling convention
         info['calling_convention'] = self.__describe_callingconvention(func_type_data.cc)
@@ -831,6 +841,7 @@ class DumpInfo():
             ea = ida_entry.get_entry(ordinal)
 
             flags = ida_bytes.get_full_flags(ea)
+            type_data = self.__get_type_data(ea)
             type = 'unknown'
             if ida_bytes.is_func(flags):
                 type = 'function'
@@ -838,10 +849,11 @@ class DumpInfo():
                 type = 'data'
 
             export = {
-                'ordinal' : ordinal,
-                'rva'     : ea - self._base,
-                'name'    : ida_entry.get_entry_name(ordinal),
-                'type'    : type
+                'ordinal'           : ordinal,
+                'rva'               : ea - self._base,
+                'name'              : ida_entry.get_entry_name(ordinal),
+                'type'              : type,
+                'calling_convention': self.__describe_callingconvention(type_data.cc)
             }
 
             exports.append(export)
@@ -922,3 +934,66 @@ class DumpInfo():
             st_idx = ida_struct.get_next_struc_idx(st_idx)
            
         return structs
+
+    def __process_types_enum_member(self, enum_member : ida_typeinf.enum_member_t):
+        result = {}
+        
+        result['name'] = enum_member.name
+        result['value'] = enum_member.value
+
+        return result
+
+    def __process_types_udt_member(self, udt_member : ida_typeinf.udt_member_t):
+        result = {}
+        
+        result['name'] = udt_member.name
+        result['offset'] = udt_member.offset // 8
+        result['size'] = udt_member.size // 8
+
+        udt_mem_type = udt_member.type
+        udt_mem_typename = udt_member.type.get_type_name()
+        if not udt_mem_typename:
+            udt_mem_typename = self.__describe_type_basetype(udt_mem_type.get_realtype())
+        result['type'] = udt_mem_typename
+
+        return result
+
+    def __process_types_tinfo(self, ti_info : ida_typeinf.tinfo_t):
+        localtype = {}
+        
+        localtype['name'] = ti_info.get_type_name()
+        localtype['basetype'] = self.__describe_type_basetype(ti_info.get_realtype())
+        localtype['size'] = ti_info.get_size()
+        if localtype['size'] == ida_idaapi.BADADDR:
+            localtype['size'] = 0
+
+        ti_udt = ida_typeinf.udt_type_data_t()
+        ti_enum = ida_typeinf.enum_type_data_t()
+
+        if ti_info.get_udt_details(ti_udt):
+            members = []
+            for member in ti_udt:
+                members.append(self.__process_types_udt_member(member))
+
+            localtype['members'] = members
+        elif ti_info.get_enum_details(ti_enum):
+            members = []
+            for member in ti_enum:
+                members.append(self.__process_types_enum_member(member))
+
+            localtype['members'] = members
+
+        return localtype
+
+    def __process_types(self):
+        localtypes = []
+
+        ti_lib_obj = ida_typeinf.get_idati()
+        ti_lib_count = ida_typeinf.get_ordinal_qty(ti_lib_obj)
+
+        for ti_ordinal in range(1, ti_lib_count + 1):
+            ti_info = ida_typeinf.tinfo_t()
+            if ti_info.get_numbered_type(ti_lib_obj, ti_ordinal):
+                localtypes.append(self.__process_types_tinfo(ti_info))
+
+        return localtypes
