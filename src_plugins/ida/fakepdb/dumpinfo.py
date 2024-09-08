@@ -426,7 +426,7 @@ class DumpInfo():
             return 'fastcall'
         elif cc == ida_typeinf.CM_CC_THISCALL:
             return 'thiscall'
-        elif cc == ida_typeinf.CM_CC_MANUAL:
+        elif cc == ida_typeinf.CM_CC_SWIFT:
             return 'manual'
         elif cc == ida_typeinf.CM_CC_SPOILED:
             return 'spoiled'
